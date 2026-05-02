@@ -4,6 +4,8 @@ import { parseAIResponse } from '@/lib/ai/parseResponse';
 import { DETECT_PROMPT } from '@/lib/prompts/detect';
 import type OpenAI from 'openai';
 
+export const maxDuration = 30;
+
 export async function POST(req: Request) {
   try {
     const { image } = await req.json();
@@ -16,7 +18,7 @@ export async function POST(req: Request) {
     ];
 
     const raw = await callAI(DETECT_PROMPT, userMsg, {
-      model: 'qwen-vl-max', temperature: 0.2, maxTokens: 1000, timeout: 25000,
+      model: 'qwen-vl-max', temperature: 0.2, maxTokens: 1000, timeout: 28000, retries: 0,
     });
 
     const result = parseAIResponse(raw) as Record<string, unknown>;

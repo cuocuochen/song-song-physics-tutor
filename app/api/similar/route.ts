@@ -4,6 +4,8 @@ import { parseAIResponse } from '@/lib/ai/parseResponse';
 import { SIMILAR_PROMPT } from '@/lib/prompts/similar';
 import type { SimilarProblemsResult } from '@/lib/types/analysis';
 
+export const maxDuration = 30;
+
 export async function POST(req: Request) {
   try {
     const { knowledgePoints, originalProblem } = await req.json();

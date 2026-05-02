@@ -5,6 +5,8 @@ import { ANALYZE_PROMPT } from '@/lib/prompts/analyze';
 import type { AnalysisResult } from '@/lib/types/analysis';
 import type OpenAI from 'openai';
 
+export const maxDuration = 30;
+
 export async function POST(req: Request) {
   try {
     const { type, content, problemIndex } = await req.json();
@@ -26,8 +28,8 @@ export async function POST(req: Request) {
       model,
       temperature: 0.3,
       maxTokens: 3000,
-      timeout: 60000,
-      retries: 2,
+      timeout: 28000,
+      retries: 0,
     });
 
     const r = parseAIResponse(raw) as Record<string, unknown>;
