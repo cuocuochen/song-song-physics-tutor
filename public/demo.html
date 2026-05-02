@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>物理题目解析系统</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<style>
+:root {
+  --bg:#0f172a; --fg:#e2e8f0; --primary:#3b82f6; --primary-light:#1e3a5f;
+  --surface:#1e293b; --border:#334155; --muted:#64748b;
+  --gravity:#ef4444; --normal:#3b82f6; --friction:#f97316; --tension:#22c55e;
+  --radius:12px;
+}
+@media(prefers-color-scheme:light){
+  :root {
+    --bg:#f8fafc; --fg:#1e293b; --primary:#2563eb; --primary-light:#dbeafe;
+    --surface:#fff; --border:#e2e8f0; --muted:#94a3b8;
+  }
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{font-size:16px}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans SC",sans-serif;
+  background:var(--bg); color:var(--fg); min-height:100vh; display:flex; flex-direction:column;
+}
+/* Header */
+header{border-bottom:1px solid var(--border); background:var(--surface); position:sticky; top:0; z-index:50; backdrop-filter:blur(8px)}
+header .inner{max-width:960px; margin:0 auto; padding:0 16px; height:56px; display:flex; align-items:center; gap:8px; font-weight:700; font-size:1.05rem}
+
+/* Tabs */
+.tab-bar{display:flex; justify-content:center; gap:4px; margin:20px auto; max-width:540px; padding:4px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius)}
+.tab-btn{flex:1; padding:10px 8px; border:none; border-radius:8px; font-size:.85rem; font-weight:600; background:transparent; color:var(--muted); cursor:pointer; transition:.15s; white-space:nowrap}
+.tab-btn.active{background:var(--primary); color:#fff}
+.tab-btn:not(.active):hover{color:var(--fg)}
+
+/* Panels */
+main{max-width:720px; margin:0 auto; padding:0 16px 60px; width:100%}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+.panel-title{font-size:1.35rem; font-weight:700; margin-bottom:4px}
+.panel-sub{font-size:.875rem; color:var(--muted); margin-bottom:20px}
+
+/* Cards */
+.card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px; margin-bottom:14px}
+.card h3{font-size:.92rem; margin-bottom:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap}
+.card p,.card li{font-size:.85rem; line-height:1.7}
+.card ol,.card ul{padding-left:20px}
+.card li{margin-bottom:3px}
+
+/* Badge */
+.badge{display:inline-block; padding:2px 8px; border-radius:999px; font-size:.7rem; font-weight:600}
+.badge-blue{background:var(--primary-light); color:var(--primary)}
+.badge-red{background:#7f1d1d33; color:var(--gravity)}
+.badge-green{background:#14532d33; color:var(--tension)}
+.badge-orange{background:#7c2d1233; color:var(--friction)}
+
+/* Upload */
+.upload-zone{border:2px dashed var(--border); border-radius:var(--radius); padding:36px 16px; text-align:center; cursor:pointer; transition:border-color .15s; margin-bottom:14px}
+.upload-zone:hover{border-color:var(--primary)}
+.upload-zone svg{margin-bottom:10px}
+.upload-zone .main-text{font-size:.9rem; font-weight:600}
+.upload-zone .sub-text{font-size:.78rem; color:var(--muted); margin-top:4px}
+
+/* Input row */
+.input-row{display:flex; gap:8px; margin-bottom:14px}
+.input-row textarea{flex:1; padding:12px; border-radius:var(--radius); border:1px solid var(--border); background:var(--surface); color:var(--fg); font-size:.88rem; resize:vertical; min-height:80px; font-family:inherit}
+.input-row textarea::placeholder{color:var(--muted)}
+.btn{padding:10px 20px; border:none; border-radius:var(--radius); font-size:.85rem; font-weight:600; cursor:pointer; transition:.15s; white-space:nowrap}
+.btn-primary{background:var(--primary); color:#fff}
+.btn-primary:hover{opacity:.9}
+.btn-ghost{background:transparent; color:var(--muted); border:1px solid var(--border)}
+.btn-ghost:hover{color:var(--fg)}
+.btn:disabled{opacity:.4; cursor:not-allowed}
+
+/* Spinner */
+.spinner-wrap{display:flex; flex-direction:column; align-items:center; padding:48px 0; gap:16px}
+.spinner{width:36px; height:36px; border:3px solid var(--border); border-top-color:var(--primary); border-radius:50%; animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner-text{font-size:.85rem; color:var(--muted)}
+
+/* Error */
+.error-card{background:#7f1d1d22; border:1px solid #7f1d1d66; border-radius:var(--radius); padding:18px; text-align:center}
+.error-card p{color:#fca5a5; font-size:.85rem; margin-bottom:12px}
+
+/* Problem selector */
+.prob-item{display:flex; align-items:center; gap:12px; padding:12px; border:1px solid var(--border); border-radius:8px; margin-bottom:8px; cursor:pointer; transition:.15s}
+.prob-item:hover{border-color:var(--primary)}
+.prob-idx{width:28px; height:28px; border-radius:50%; background:var(--primary-light); color:var(--primary); display:flex; align-items:center; justify-content:center; font-size:.78rem; font-weight:700; flex-shrink:0}
+.prob-info{flex:1; min-width:0}
+.prob-desc{font-size:.82rem; line-height:1.5}
+.prob-conf{font-size:.7rem; color:var(--muted)}
+
+/* Steps */
+.step-list{list-style:none; padding:0}
+.step-list li{display:flex; gap:10px; align-items:flex-start; margin-bottom:8px; font-size:.85rem; line-height:1.6}
+.step-num{width:22px; height:22px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-size:.7rem; font-weight:700; flex-shrink:0; margin-top:2px}
+
+/* Diagram */
+.diagram-box{background:#0a0f1a; border:1px solid var(--border); border-radius:8px; display:flex; align-items:center; justify-content:center; min-height:200px; margin-top:10px; overflow-x:auto}
+@media(prefers-color-scheme:light){.diagram-box{background:#f1f5f9}}
+.diagram-box svg{width:100%; max-width:420px; height:auto}
+
+/* Equation */
+.eq-box{background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:10px 14px; margin:6px 0; overflow-x:auto; font-size:.9rem; min-height:2em}
+
+/* Chat */
+.chat-msg{padding:12px 16px; border-radius:var(--radius); margin-bottom:10px; font-size:.85rem; line-height:1.6; max-width:92%}
+.chat-teacher{background:var(--surface); border:1px solid var(--border)}
+.chat-student{background:var(--primary-light); border:1px solid var(--primary); margin-left:auto}
+
+/* Progress bar */
+.prog-wrap{display:flex; align-items:center; gap:8px; font-size:.8rem; color:var(--muted); margin-bottom:16px}
+.prog-bar{flex:1; height:6px; background:var(--border); border-radius:3px; overflow:hidden}
+.prog-fill{height:100%; background:var(--primary); border-radius:3px; transition:width .3s}
+
+/* Name input */
+.name-block{display:flex; flex-direction:column; align-items:center; padding:48px 0; gap:16px}
+.name-block input{width:200px; padding:10px 14px; border-radius:var(--radius); border:1px solid var(--border); background:var(--surface); color:var(--fg); font-size:.88rem; font-family:inherit; text-align:center}
+.name-block input:focus{outline:none; border-color:var(--primary)}
+
+/* Footer */
+footer{margin-top:auto; border-top:1px solid var(--border); text-align:center; padding:14px; font-size:.72rem; color:var(--muted)}
+
+/* Diff comparison */
+.diff-table{width:100%; border-collapse:collapse; font-size:.82rem; margin:8px 0}
+.diff-table td{padding:8px 10px; border:1px solid var(--border); vertical-align:top; line-height:1.5}
+.diff-table td:first-child{width:45%; color:var(--friction)}
+.diff-table td:last-child{width:55%; color:var(--tension)}
+
+/* Mobile */
+@media(max-width:640px){
+  .tab-btn{font-size:.75rem; padding:8px 4px}
+  .card{padding:14px}
+  .panel-title{font-size:1.15rem}
+  .chat-msg{max-width:96%}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="inner">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2">
+      <circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/>
+      <line x1="12" y1="18" x2="12" y2="22"/><line x1="6" y1="12" x2="2" y2="12" stroke="var(--gravity)"/>
+      <line x1="18" y1="12" x2="22" y2="12" stroke="var(--tension)"/>
+    </svg>
+    <span>物理题目解析系统</span>
+  </div>
+</header>
+
+<div class="tab-bar" role="tablist">
+  <button class="tab-btn active" data-tab="analyze">🔍 解题助手</button>
+  <button class="tab-btn" data-tab="similar">📚 同类题</button>
+  <button class="tab-btn" data-tab="learn">💡 你懂了吗？</button>
+</div>
+
+<main>
+  <div class="tab-panel active" id="panel-analyze"></div>
+  <div class="tab-panel" id="panel-similar"></div>
+  <div class="tab-panel" id="panel-learn"></div>
+</main>
+
+<footer>Powered by DashScope Qwen · 松松项目</footer>
+
+<script>
+// ============================================================
+// App State
+// ============================================================
+const S = {
+  tab: 'analyze',
+  // Analyze
+  step: 'input', // input|detecting|selecting|analyzing|done|error
+  error: '',
+  imageBase64: '',
+  inputType: 'image',
+  detectedProblems: [],
+  analysis: null,
+  // Similar
+  simState: 'idle', // idle|loading|done|error
+  simError: '',
+  similarResult: null,
+  // Learn
+  learnState: 'name', // name|loading|active|feedback|complete|error
+  learnError: '',
+  studentId: '',
+  chats: [],
+  progress: { current: 0, total: 3 },
+  feedback: null,
+  nextQuestion: null,
+  isSubmitting: false,
+};
+
+// Restore from sessionStorage
+function restore() {
+  try {
+    const stored = sessionStorage.getItem('physics_analysis');
+    if (stored) {
+      S.analysis = JSON.parse(stored);
+      S.step = 'done';
+      const img = sessionStorage.getItem('physics_image');
+      if (img) { S.imageBase64 = img; S.inputType = 'image'; } else { S.inputType = 'text'; }
+    }
+    const name = localStorage.getItem('physics_student_name');
+    if (name) { S.studentId = name; S.learnState = 'loading'; }
+  } catch(e) { /* ignore */ }
+}
+restore();
+
+// ============================================================
+// API helpers
+// ============================================================
+async function apiPost(path, body) {
+  const resp = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) {
+    const e = await resp.json().catch(() => ({ error: '请求失败' }));
+    throw new Error(e.error || `HTTP ${resp.status}`);
+  }
+  return resp.json();
+}
+
+// ============================================================
+// Render
+// ============================================================
+function render() {
+  renderAnalyze();
+  renderSimilar();
+  renderLearn();
+}
+
+// ---------- Tab: Analyze ----------
+function renderAnalyze() {
+  const el = document.getElementById('panel-analyze');
+  switch (S.step) {
+    case 'input':
+      el.innerHTML = `
+        <div class="panel-title">物理题目解析</div>
+        <p class="panel-sub">上传题目图片或输入文字，获得详细解题分析</p>
+        <div class="upload-zone" id="upload-zone">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.5">
+            <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
+          </svg>
+          <div class="main-text">点击上传题目截图</div>
+          <div class="sub-text">支持 PNG / JPG / WEBP，建议清晰截图</div>
+          <input type="file" accept="image/*" hidden id="file-input">
+        </div>
+        <div class="input-row">
+          <textarea placeholder="或直接输入物理题目文字，如：一质量为 m 的物体静止在倾角为 θ 的斜面上，求斜面对物体的支持力大小和方向..." id="text-input"></textarea>
+          <button class="btn btn-primary" id="btn-text-submit">发送</button>
+        </div>`;
+      bindAnalyzeInput();
+      break;
+    case 'detecting':
+      el.innerHTML = `<div class="spinner-wrap"><div class="spinner"></div><div class="spinner-text">正在检测图片中的题目...</div></div>`;
+      break;
+    case 'selecting':
+      el.innerHTML = `
+        <div class="panel-title">检测到多道题目</div>
+        <p class="panel-sub">请选择要解析的题目，或选择"全部合并解析"</p>
+        <div id="prob-list"></div>
+        <button class="btn btn-ghost" id="btn-select-all" style="width:100%;margin-top:8px">📋 全部合并解析</button>`;
+      renderProblemList();
+      break;
+    case 'analyzing':
+      el.innerHTML = `<div class="spinner-wrap"><div class="spinner"></div><div class="spinner-text">AI 正在分析题目，生成详细解答${S.inputType==='image'?' (视觉模型)':''}...</div></div>`;
+      break;
+    case 'done':
+      if (S.analysis) renderAnalysisResult(el);
+      break;
+    case 'error':
+      el.innerHTML = `
+        <div class="error-card"><p>${esc(S.error)}</p>
+          <button class="btn btn-primary" id="btn-retry">重新开始</button>
+        </div>`;
+      document.getElementById('btn-retry').onclick = () => { S.step='input'; S.error=''; render(); };
+      break;
+  }
+}
+
+function bindAnalyzeInput() {
+  document.getElementById('upload-zone').onclick = () => document.getElementById('file-input').click();
+  document.getElementById('file-input').onchange = function() {
+    if (!this.files[0]) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const b64 = reader.result.split(',')[1];
+      S.imageBase64 = b64;
+      S.inputType = 'image';
+      detectProblems(b64);
+    };
+    reader.readAsDataURL(this.files[0]);
+  };
+  document.getElementById('btn-text-submit').onclick = () => {
+    const text = document.getElementById('text-input').value.trim();
+    if (!text) return;
+    S.inputType = 'text';
+    runAnalysis('text', text);
+  };
+}
+
+function renderProblemList() {
+  const list = document.getElementById('prob-list');
+  list.innerHTML = S.detectedProblems.map((p, i) => `
+    <div class="prob-item" data-idx="${i}">
+      <div class="prob-idx">${p.index ?? (i + 1)}</div>
+      <div class="prob-info"><div class="prob-desc">${esc(p.description)}</div></div>
+      <div class="prob-conf">置信度 ${((p.confidence ?? 0.8) * 100).toFixed(0)}%</div>
+    </div>`).join('');
+  list.querySelectorAll('.prob-item').forEach(el => {
+    el.onclick = () => runAnalysis('image', S.imageBase64, S.detectedProblems[parseInt(el.dataset.idx)].index);
+  });
+  document.getElementById('btn-select-all').onclick = () => runAnalysis('image', S.imageBase64);
+}
+
+async function detectProblems(base64) {
+  S.step = 'detecting'; S.error = ''; render();
+  try {
+    const data = await apiPost('/api/detect', { image: base64 });
+    if (data.count > 1 && data.problems.length > 1) {
+      S.detectedProblems = data.problems;
+      S.step = 'selecting';
+    } else {
+      await runAnalysis('image', base64);
+      return;
+    }
+  } catch(e) {
+    S.error = e.message; S.step = 'error';
+  }
+  render();
+}
+
+async function runAnalysis(type, content, problemIndex) {
+  S.step = 'analyzing'; S.error = ''; render();
+  try {
+    const body = { type, content };
+    if (problemIndex !== undefined) body.problemIndex = problemIndex;
+    const data = await apiPost('/api/analyze', body);
+    S.analysis = data;
+    try {
+      sessionStorage.setItem('physics_analysis', JSON.stringify(data));
+      if (type === 'image') sessionStorage.setItem('physics_image', content);
+    } catch(e) { /* non-critical */ }
+    S.step = 'done';
+  } catch(e) {
+    S.error = e.message; S.step = 'error';
+  }
+  render();
+}
+
+function renderAnalysisResult(el) {
+  const r = S.analysis;
+  const headerBtns = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div>
+        <div class="panel-title">解析结果</div>
+        <p class="panel-sub">${S.inputType === 'image' ? '图片识别解析' : '文字题目解析'}</p>
+      </div>
+      <button class="btn btn-ghost" id="btn-new">解析新题</button>
+    </div>`;
+
+  const ch = r.characteristic || {};
+  const ap = r.approach || {};
+  const sol = r.solution || {};
+  const s1 = sol.step1 || {}, s2 = sol.step2 || {}, s3 = sol.step3 || {};
+
+  let html = headerBtns;
+  html += `<div class="card"><h3><span class="badge badge-blue">题目特征</span></h3>
+    <p><strong>物理场景与过程：</strong>${esc(ch.scenarioAndProcess || '无')}</p>
+    <p style="margin-top:6px"><strong>模型与条件：</strong>${esc(ch.modelAndConditions || '无')}</p></div>`;
+
+  html += `<div class="card"><h3><span class="badge badge-orange">解题思路</span></h3>
+    <p><strong>审题与建模：</strong>${esc(ap.readingAndModeling || '无')}</p>
+    <p style="margin-top:6px"><strong>物理概念：</strong>${esc(ap.physicsConcepts || '无')}</p>
+    ${(ap.generalSteps||[]).length ? '<ol class="step-list" style="margin-top:8px">' + ap.generalSteps.map(s => `<li><span class="step-num">→</span>${esc(s)}</li>`).join('') + '</ol>' : ''}
+    </div>`;
+
+  // Solution
+  html += `<div class="card"><h3><span class="badge badge-green">详细解答</span></h3>`;
+
+  // Step 1
+  html += `<p style="font-weight:600;margin-top:8px">步骤 1：受力分析与建模</p>
+    <p style="color:var(--muted);font-size:.82rem;margin-top:4px">${esc(s1.description || '无')}</p>`;
+  if (s1.diagramSpec) html += renderDiagram(s1.diagramSpec);
+
+  // Step 2
+  html += `<p style="font-weight:600;margin-top:14px">步骤 2：列方程</p>
+    <p style="color:var(--muted);font-size:.82rem;margin-top:4px">${esc(s2.description || '无')}</p>`;
+  (s2.equations || []).forEach(eq => {
+    html += `<div class="eq-box" data-katex="${escAttr(eq)}">${esc(eq)}</div>`;
+  });
+
+  // Step 3
+  html += `<p style="font-weight:600;margin-top:14px">步骤 3：求解与结论</p>
+    <p style="color:var(--muted);font-size:.82rem;margin-top:4px">${esc(s3.description || '无')}</p>`;
+  if (s3.finalAnswer) html += `<div class="eq-box" data-katex="${escAttr(s3.finalAnswer)}">${esc(s3.finalAnswer)}</div>`;
+
+  html += `</div>`;
+
+  // Knowledge points
+  if ((r.coreKnowledgePoints || []).length) {
+    html += `<p style="margin-top:10px">${r.coreKnowledgePoints.map(k => `<span class="badge badge-blue" style="margin:2px">${esc(k)}</span>`).join(' ')}</p>`;
+  }
+
+  // Actions
+  html += `<div style="display:flex;gap:10px;margin-top:16px">
+    <button class="btn btn-ghost" id="btn-goto-similar">📚 生成同类题</button>
+    <button class="btn btn-primary" id="btn-goto-learn">💡 检验学习效果</button>
+  </div>`;
+
+  el.innerHTML = html;
+
+  // Bind
+  document.getElementById('btn-new').onclick = () => { S.step='input'; S.error=''; S.analysis=null; S.simState='idle'; S.similarResult=null; sessionStorage.clear(); render(); };
+  document.getElementById('btn-goto-similar').onclick = () => switchTab('similar');
+  document.getElementById('btn-goto-learn').onclick = () => switchTab('learn');
+
+  // Render KaTeX
+  renderKatexIn(el);
+}
+
+// ---------- SVG Diagram Renderer ----------
+function renderDiagram(spec) {
+  if (!spec || !spec.objects) return `<p style="color:var(--muted);font-size:.8rem;margin-top:8px">(无可视化的受力图数据)</p>`;
+  const vb = spec.viewBox || { width: 680, height: 440 };
+  const w = vb.width, h = vb.height;
+  const colors = { gravity: '#ef4444', normal: '#3b82f6', friction: '#f97316', tension: '#22c55e' };
+
+  let svg = '';
+  // Objects
+  (spec.objects || []).forEach(obj => {
+    const t = obj.type;
+    if (t === 'ground') {
+      const x1 = obj.x1 ?? 40, x2 = obj.x2 ?? (w - 40), y = obj.y ?? (h - 60);
+      svg += `<line x1="${x1}" x2="${x2}" y1="${y}" y2="${y}" stroke="#94a3b8" stroke-width="2"/>`;
+      for (let x = x1; x < x2; x += 18)
+        svg += `<line x1="${x}" x2="${x+9}" y1="${y}" y2="${y+6}" stroke="#64748b" stroke-width="1"/>`;
+    } else if (t === 'slope_surface') {
+      const x1 = obj.x1 ?? 150, y1 = obj.y1 ?? (h - 90);
+      const angle = (obj.angle ?? 30) * Math.PI / 180;
+      const len = obj.length ?? 300;
+      const x2 = x1 + len * Math.cos(angle);
+      const y2 = y1 - len * Math.sin(angle);
+      svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#94a3b8" stroke-width="2"/>`;
+      // hatch marks for slope
+      for (let d = 10; d < len - 10; d += 20) {
+        const sx = x1 + d * Math.cos(angle), sy = y1 - d * Math.sin(angle);
+        svg += `<line x1="${sx}" y1="${sy}" x2="${sx+6}" y2="${sy+8}" stroke="#64748b" stroke-width="1"/>`;
+      }
+    } else if (t === 'block') {
+      const cx = obj.cx ?? (w / 2), cy = obj.cy ?? (h / 2);
+      const bw = obj.width ?? 64, bh = obj.height ?? 36;
+      const ang = obj.angle ?? 0;
+      const label = obj.label ?? '';
+      const x = cx - bw/2, y = cy - bh/2;
+      if (ang !== 0) {
+        svg += `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" rx="3" fill="var(--surface)" stroke="var(--fg)" stroke-width="1.5" transform="rotate(${ang},${cx},${cy})"/>`;
+        if (label)
+          svg += `<text x="${cx}" y="${cy+5}" fill="var(--fg)" font-size="13" font-weight="600" text-anchor="middle" transform="rotate(${ang},${cx},${cy})">${esc(label)}</text>`;
+      } else {
+        svg += `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" rx="3" fill="var(--surface)" stroke="var(--fg)" stroke-width="1.5"/>`;
+        if (label)
+          svg += `<text x="${cx}" y="${cy+5}" fill="var(--fg)" font-size="13" font-weight="600" text-anchor="middle">${esc(label)}</text>`;
+      }
+    } else if (t === 'ball') {
+      const cx = obj.cx ?? (w/2), cy = obj.cy ?? (h/2), r = obj.radius ?? 20;
+      svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="var(--surface)" stroke="var(--fg)" stroke-width="1.5"/>`;
+      if (obj.label) svg += `<text x="${cx}" y="${cy+5}" fill="var(--fg)" font-size="12" text-anchor="middle">${esc(obj.label)}</text>`;
+    } else if (t === 'wedge') {
+      const cx = obj.cx ?? (w/2), cy = obj.cy ?? (h/2);
+      const bw = obj.width ?? 100, bh = obj.height ?? 60;
+      const pts = `${cx - bw/2},${cy + bh/2} ${cx + bw/2},${cy + bh/2} ${cx + bw/2},${cy - bh/2}`;
+      svg += `<polygon points="${pts}" fill="none" stroke="var(--fg)" stroke-width="1.5"/>`;
+    } else if (t === 'ceiling') {
+      const x1 = obj.x1 ?? 40, x2 = obj.x2 ?? (w - 40), y = obj.y ?? 40;
+      svg += `<line x1="${x1}" x2="${x2}" y1="${y}" y2="${y}" stroke="#94a3b8" stroke-width="2"/>`;
+      for (let x = x1; x < x2; x += 18)
+        svg += `<line x1="${x}" x2="${x+9}" y1="${y}" y2="${y-6}" stroke="#64748b" stroke-width="1"/>`;
+    } else if (t === 'rope') {
+      const x1 = obj.x1 ?? (w/2), y1 = obj.y1 ?? 40, x2 = obj.x2 ?? (w/2), y2 = obj.y2 ?? (h/2);
+      svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="6,3"/>`;
+    } else if (t === 'pulley') {
+      const cx = obj.cx ?? (w/2), cy = obj.cy ?? 80, r = obj.radius ?? 18;
+      svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--fg)" stroke-width="2"/>`;
+      svg += `<circle cx="${cx}" cy="${cy}" r="3" fill="var(--fg)"/>`;
+    } else if (t === 'spring') {
+      const x1 = obj.x1 ?? (w/2), y1 = obj.y1 ?? 80, x2 = obj.x2 ?? (w/2), y2 = obj.y2 ?? (h/2);
+      const coils = obj.coils ?? 6, amp = 8;
+      let d = '';
+      const dx = (x2 - x1), dy = (y2 - y1);
+      const len = Math.sqrt(dx*dx + dy*dy);
+      const ux = dx/len, uy = dy/len;
+      const nx = -uy, ny = ux;
+      const seg = len / (coils * 2);
+      let px = x1, py = y1;
+      for (let i = 1; i <= coils * 2; i++) {
+        const t = i * seg;
+        const mx = x1 + ux * t + (i % 2 === 1 ? amp : -amp) * nx;
+        const my = y1 + uy * t + (i % 2 === 1 ? amp : -amp) * ny;
+        d += `L${mx},${my} `;
+      }
+      svg += `<path d="M${x1},${y1} ${d}" fill="none" stroke="var(--fg)" stroke-width="1.5"/>`;
+    }
+  });
+
+  // Forces
+  (spec.forces || []).forEach(f => {
+    let x1, y1, x2, y2;
+    if (f.x1 !== undefined) {
+      x1 = f.x1; y1 = f.y1; x2 = f.x2 ?? x1; y2 = f.y2 ?? y1;
+    } else {
+      // Derive from center
+      const cx = w/2, cy = h/2;
+      x1 = cx; y1 = cy;
+      const arrowLen = 55;
+      if (f.direction === 'down') { x2 = x1; y2 = y1 + arrowLen; }
+      else if (f.direction === 'up') { x2 = x1; y2 = y1 - arrowLen; }
+      else if (f.direction === 'left') { x2 = x1 - arrowLen; y2 = y1; }
+      else if (f.direction === 'right') { x2 = x1 + arrowLen; y2 = y1; }
+      else if (f.direction === 'up_slope') { const a = -(30 * Math.PI/180); x2 = x1 - arrowLen*Math.cos(a); y2 = y1 - arrowLen*Math.sin(a); }
+      else if (f.direction === 'down_slope') { const a = -(30 * Math.PI/180); x2 = x1 + arrowLen*Math.cos(a); y2 = y1 + arrowLen*Math.sin(a); }
+      else if (f.angle !== undefined) { const a = f.angle * Math.PI/180; x2 = x1 + arrowLen*Math.cos(a); y2 = y1 - arrowLen*Math.sin(a); }
+      else { x2 = x1; y2 = y1 + arrowLen; }
+    }
+    const col = colors[f.color] || '#e2e8f0';
+    svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="2"/>`;
+    // Arrowhead
+    const ang = Math.atan2(y2 - y1, x2 - x1);
+    const hl = 8, hw = 4;
+    svg += `<polygon points="${x2},${y2} ${x2 - hl*Math.cos(ang-Math.PI/6)},${y2 - hl*Math.sin(ang-Math.PI/6)} ${x2 - hl*Math.cos(ang+Math.PI/6)},${y2 - hl*Math.sin(ang+Math.PI/6)}" fill="${col}"/>`;
+    // Label
+    const lx = x2 + 12 * Math.cos(ang), ly = y2 + 12 * Math.sin(ang);
+    const mag = f.magnitude ? `=${f.magnitude}` : '';
+    svg += `<text x="${lx}" y="${ly}" fill="${col}" font-size="12" font-weight="600">${esc(f.label)}${mag}</text>`;
+  });
+
+  // Angle marks
+  (spec.angle_marks || []).forEach(a => {
+    const r = a.radius ?? 30;
+    const sa = a.startAngle * Math.PI / 180;
+    const ea = a.endAngle * Math.PI / 180;
+    const sweep = a.sweep ?? 0;
+    const x1 = a.cx + r * Math.cos(-sa), y1 = a.cy - r * Math.sin(-sa);
+    const x2 = a.cx + r * Math.cos(-ea), y2 = a.cy - r * Math.sin(-ea);
+    const large = Math.abs(ea - sa) > Math.PI ? 1 : 0;
+    svg += `<path d="M${x1},${y1} A${r},${r} 0 ${large} ${sweep} ${x2},${y2}" fill="none" stroke="var(--fg)" stroke-width="1"/>`;
+    const mlx = a.cx + (r + 14) * Math.cos(-(sa+ea)/2), mly = a.cy - (r + 14) * Math.sin(-(sa+ea)/2);
+    svg += `<text x="${mlx}" y="${mly}" fill="var(--fg)" font-size="11" text-anchor="middle">${esc(a.label)}</text>`;
+  });
+
+  // Labels
+  (spec.labels || []).forEach(l => {
+    svg += `<text x="${l.x}" y="${l.y}" fill="var(--fg)" font-size="${l.fontSize || 12}" text-anchor="middle">${esc(l.text)}</text>`;
+  });
+
+  return `<div class="diagram-box"><svg viewBox="0 0 ${w} ${h}" style="max-width:420px">${svg}</svg></div>`;
+}
+
+// ---------- Tab: Similar ----------
+function renderSimilar() {
+  const el = document.getElementById('panel-similar');
+  if (!S.analysis) {
+    el.innerHTML = `
+      <div style="text-align:center;padding:48px 0">
+        <p style="color:var(--muted);margin-bottom:14px">请先在解题助手页完成题目解析</p>
+        <button class="btn btn-primary" id="btn-sim-goto-analyze">前往解析</button>
+      </div>`;
+    document.getElementById('btn-sim-goto-analyze').onclick = () => switchTab('analyze');
+    return;
+  }
+
+  if (S.simState === 'loading') {
+    el.innerHTML = `<div class="spinner-wrap"><div class="spinner"></div><div class="spinner-text">正在生成同类题...</div></div>`;
+    return;
+  }
+  if (S.simState === 'error') {
+    el.innerHTML = `<div class="error-card"><p>${esc(S.simError)}</p></div>`;
+    return;
+  }
+  if (S.simState === 'idle') {
+    el.innerHTML = `
+      <div class="panel-title">同类题练习</div>
+      <p class="panel-sub">基于核心知识点生成的变式训练</p>
+      <div style="text-align:center;padding:24px 0">
+        <button class="btn btn-primary" id="btn-gen-similar">✨ 生成同类题</button>
+      </div>`;
+    document.getElementById('btn-gen-similar').onclick = fetchSimilar;
+    return;
+  }
+  if (S.simState === 'done' && S.similarResult) {
+    renderSimilarResult(el);
+  }
+}
+
+async function fetchSimilar() {
+  S.simState = 'loading'; S.simError = ''; render();
+  try {
+    const data = await apiPost('/api/similar', {
+      knowledgePoints: S.analysis.coreKnowledgePoints || [],
+      originalProblem: S.analysis.characteristic?.scenarioAndProcess || '',
+    });
+    S.similarResult = data;
+    S.simState = 'done';
+  } catch(e) {
+    S.simError = e.message; S.simState = 'error';
+  }
+  render();
+}
+
+function renderSimilarResult(el) {
+  const r = S.similarResult;
+  const diffMap = { easy: '基础', medium: '中等', hard: '较难' };
+  const diffBadge = { easy: 'badge-green', medium: 'badge-orange', hard: 'badge-red' };
+  let html = `
+    <div class="panel-title">同类题练习</div>
+    <p class="panel-sub">基于核心知识点生成的变式训练</p>
+    <div class="card"><h3>📝 知识点总结</h3><p>${esc(r.knowledgeSummary || '无')}</p></div>`;
+  (r.similarProblems || []).forEach((p, i) => {
+    html += `<div class="card">
+      <h3>变式题 ${i+1} <span class="badge ${diffBadge[p.difficulty] || 'badge-blue'}" style="margin-left:6px">${diffMap[p.difficulty] || p.difficulty}</span></h3>
+      <p>${esc(p.problem)}</p>
+      <details style="margin-top:8px"><summary style="cursor:pointer;font-size:.8rem;color:var(--primary)">查看答案</summary>
+        <p style="margin-top:6px;color:var(--tension);font-size:.82rem">${esc(p.briefAnswer)}</p></details>
+      <p style="color:var(--friction);font-size:.78rem;margin-top:6px">💡 提示：${esc(p.keyHint)}</p>
+    </div>`;
+  });
+  html += `<div style="display:flex;gap:10px;margin-top:16px">
+    <button class="btn btn-ghost" id="btn-sim-back">← 返回解析</button>
+    <button class="btn btn-primary" id="btn-sim-learn">💡 检验学习效果 →</button>
+  </div>`;
+  el.innerHTML = html;
+  document.getElementById('btn-sim-back').onclick = () => switchTab('analyze');
+  document.getElementById('btn-sim-learn').onclick = () => switchTab('learn');
+}
+
+// ---------- Tab: Learn ----------
+function renderLearn() {
+  const el = document.getElementById('panel-learn');
+  if (!S.analysis) {
+    el.innerHTML = `
+      <div style="text-align:center;padding:48px 0">
+        <p style="color:var(--muted);margin-bottom:14px">请先在解题助手页完成题目解析</p>
+        <button class="btn btn-primary" id="btn-learn-goto-analyze">前往解析</button>
+      </div>`;
+    document.getElementById('btn-learn-goto-analyze').onclick = () => switchTab('analyze');
+    return;
+  }
+
+  if (!S.studentId) {
+    el.innerHTML = `
+      <div class="name-block">
+        <p style="font-size:2.5rem">👋</p>
+        <h3 style="font-size:1.1rem;font-weight:700">输入你的名字</h3>
+        <p style="font-size:.82rem;color:var(--muted);margin-bottom:4px">学习记录会保存在云端</p>
+        <input type="text" id="name-input" placeholder="你的名字" autocomplete="off">
+        <button class="btn btn-primary" id="btn-set-name" disabled>开始</button>
+      </div>`;
+    const inp = document.getElementById('name-input');
+    const btn = document.getElementById('btn-set-name');
+    inp.oninput = () => btn.disabled = !inp.value.trim();
+    inp.onkeydown = e => { if (e.key === 'Enter' && inp.value.trim()) setStudentName(inp.value.trim()); };
+    btn.onclick = () => setStudentName(inp.value.trim());
+    return;
+  }
+
+  if (S.learnState === 'loading') {
+    el.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <span style="font-size:.8rem;color:var(--muted)">👤 ${esc(S.studentId)}</span>
+        <button class="btn btn-ghost" id="btn-switch-student" style="font-size:.7rem;padding:4px 10px">切换</button>
+      </div>
+      <div class="spinner-wrap"><div class="spinner"></div><div class="spinner-text">老师正在准备问题...</div></div>`;
+    document.getElementById('btn-switch-student').onclick = () => { S.studentId = ''; localStorage.removeItem('physics_student_name'); S.learnState = 'name'; render(); };
+    return;
+  }
+  if (S.learnState === 'error') {
+    el.innerHTML = `<div class="error-card"><p>${esc(S.learnError)}</p></div>`;
+    return;
+  }
+
+  // Active / feedback / complete
+  const prog = S.progress;
+  let html = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <span style="font-size:.8rem;color:var(--muted)">👤 ${esc(S.studentId)}</span>
+      <button class="btn btn-ghost" id="btn-switch-student2" style="font-size:.7rem;padding:4px 10px">切换</button>
+    </div>
+    <div class="panel-title">你真的学懂了吗？</div>
+    <p class="panel-sub">回答以下问题，检验你的理解</p>
+    <div class="prog-wrap">
+      <span>进度：</span>
+      <div class="prog-bar"><div class="prog-fill" style="width:${(prog.current / prog.total) * 100}%"></div></div>
+      <span>${prog.current} / ${prog.total}</span>
+    </div>`;
+
+  // Chat messages
+  html += `<div style="margin-bottom:16px">`;
+  S.chats.forEach(c => {
+    html += `<div class="chat-msg ${c.role === 'teacher' ? 'chat-teacher' : 'chat-student'}">${c.role === 'teacher' ? '👨‍🏫 <strong>老师：</strong>' : '🧑‍🎓 <strong>你：</strong>'}${esc(c.content)}</div>`;
+  });
+  html += `</div>`;
+
+  if (S.learnState === 'feedback' && S.feedback) {
+    const fb = S.feedback;
+    html += `<div class="card">
+      <div style="font-weight:600;font-size:.88rem;margin-bottom:8px">📋 学习反馈</div>`;
+    if (fb.studentSaid && fb.referenceAnswer) {
+      html += `<table class="diff-table">
+        <tr><td>${esc(fb.studentSaid)}</td><td>${esc(fb.referenceAnswer)}</td></tr>
+      </table>`;
+    }
+    if (fb.diff) html += `<p style="font-size:.82rem;line-height:1.6;margin-top:6px">${esc(fb.diff)}</p>`;
+    if (fb.continuePrompt) html += `<p style="color:var(--primary);font-size:.8rem;margin-top:8px">${esc(fb.continuePrompt)}</p>`;
+    html += `</div>
+      <button class="btn btn-primary" id="btn-continue" style="width:100%">继续</button>`;
+  }
+
+  if (S.learnState === 'complete') {
+    html += `<div class="card" style="background:var(--primary-light);text-align:center">
+      <p style="font-size:2rem">🎉</p>
+      <h3 style="color:var(--primary)">学习完成！</h3>
+      <p style="font-size:.82rem;color:var(--muted);margin-top:4px">你已完成全部 ${prog.total} 道检验题</p>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <button class="btn btn-ghost" id="btn-learn-back" style="flex:1">返回解析</button>
+      <button class="btn btn-primary" id="btn-learn-similar" style="flex:1">再做同类题</button>
+    </div>`;
+  }
+
+  if (S.learnState === 'active') {
+    html += `
+      <div class="input-row">
+        <textarea placeholder="输入你的答案..." id="learn-answer" style="min-height:56px"></textarea>
+        <button class="btn btn-primary" id="btn-submit-answer" disabled>回答</button>
+      </div>
+      <button class="btn btn-ghost" id="btn-skip" style="width:100%;border-style:dashed">我已掌握，直接看答案 →</button>`;
+  }
+
+  el.innerHTML = html;
+
+  // Bind event handlers
+  const switchBtn = document.getElementById('btn-switch-student2');
+  if (switchBtn) switchBtn.onclick = () => { S.studentId = ''; localStorage.removeItem('physics_student_name'); S.learnState = 'name'; S.chats = []; render(); };
+
+  if (S.learnState === 'feedback') {
+    document.getElementById('btn-continue').onclick = handleContinue;
+  }
+  if (S.learnState === 'complete') {
+    document.getElementById('btn-learn-back').onclick = () => switchTab('analyze');
+    document.getElementById('btn-learn-similar').onclick = () => switchTab('similar');
+  }
+  if (S.learnState === 'active') {
+    const ansInp = document.getElementById('learn-answer');
+    const submitBtn = document.getElementById('btn-submit-answer');
+    ansInp.oninput = () => submitBtn.disabled = !ansInp.value.trim();
+    ansInp.onkeydown = e => {
+      if (e.key === 'Enter' && !e.shiftKey && ansInp.value.trim()) { e.preventDefault(); submitAnswer(ansInp.value.trim()); }
+    };
+    submitBtn.onclick = () => submitAnswer(ansInp.value.trim());
+    document.getElementById('btn-skip').onclick = handleSkip;
+  }
+}
+
+function setStudentName(name) {
+  S.studentId = name;
+  try { localStorage.setItem('physics_student_name', name); } catch(e) { /* ignore */ }
+  S.learnState = 'loading'; S.chats = []; S.feedback = null; S.nextQuestion = null;
+  render();
+  startLearn();
+}
+
+async function startLearn() {
+  S.learnState = 'loading'; S.learnError = ''; render();
+  try {
+    const data = await apiPost('/api/learn', {
+      action: 'start',
+      context: {
+        knowledgePoints: S.analysis.coreKnowledgePoints || [],
+        originalProblem: S.analysis.characteristic?.scenarioAndProcess || '',
+      },
+      studentId: S.studentId,
+    });
+    S.chats = [{ role: 'teacher', content: data.content }];
+    S.progress = data.progress || { current: 1, total: 3 };
+    S.learnState = 'active';
+  } catch(e) {
+    S.learnError = e.message; S.learnState = 'error';
+  }
+  render();
+}
+
+async function submitAnswer(answer) {
+  S.chats.push({ role: 'student', content: answer });
+  S.isSubmitting = true; render();
+  try {
+    const data = await apiPost('/api/learn', {
+      action: 'answer',
+      context: {
+        knowledgePoints: S.analysis.coreKnowledgePoints || [],
+        originalProblem: S.analysis.characteristic?.scenarioAndProcess || '',
+      },
+      userAnswer: answer,
+      questionIndex: S.progress.current,
+      studentId: S.studentId,
+    });
+
+    if (data.type === 'feedback' || data.type === 'skip_feedback') {
+      S.feedback = {
+        studentSaid: data.studentSaid,
+        referenceAnswer: data.referenceAnswer,
+        diff: data.diff || data.content,
+        continuePrompt: data.continuePrompt,
+      };
+      S.nextQuestion = data.content || null;
+      if (data.progress) S.progress = data.progress;
+      S.learnState = 'feedback';
+    } else if (data.type === 'complete') {
+      S.chats.push({ role: 'teacher', content: data.content });
+      if (data.progress) S.progress = data.progress;
+      S.learnState = 'complete';
+    }
+  } catch(e) {
+    S.learnError = e.message; S.learnState = 'error';
+  } finally {
+    S.isSubmitting = false;
+  }
+  render();
+}
+
+function handleContinue() {
+  if (S.nextQuestion) S.chats.push({ role: 'teacher', content: S.nextQuestion });
+  S.feedback = null; S.nextQuestion = null;
+  S.learnState = 'active';
+  render();
+}
+
+async function handleSkip() {
+  S.isSubmitting = true; render();
+  try {
+    const data = await apiPost('/api/learn', {
+      action: 'skip',
+      context: {
+        knowledgePoints: S.analysis.coreKnowledgePoints || [],
+        originalProblem: S.analysis.characteristic?.scenarioAndProcess || '',
+      },
+      questionIndex: S.progress.current,
+      studentId: S.studentId,
+    });
+    if (data.type === 'skip_feedback') {
+      S.feedback = {
+        studentSaid: '（已跳过）',
+        referenceAnswer: data.referenceAnswer,
+        diff: data.content,
+      };
+      S.nextQuestion = data.content || null;
+      if (data.progress) S.progress = data.progress;
+      S.learnState = 'feedback';
+    } else if (data.type === 'complete') {
+      S.chats.push({ role: 'teacher', content: data.content });
+      if (data.progress) S.progress = data.progress;
+      S.learnState = 'complete';
+    }
+  } catch(e) {
+    S.learnError = e.message; S.learnState = 'error';
+  } finally {
+    S.isSubmitting = false;
+  }
+  render();
+}
+
+// ============================================================
+// Shared
+// ============================================================
+function switchTab(tab) {
+  S.tab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `panel-${tab}`));
+  // Trigger tab-specific loading
+  if (tab === 'similar' && S.analysis && S.simState === 'idle') { /* user clicks button */ }
+  if (tab === 'learn' && S.analysis && S.learnState === 'loading' && S.studentId) { startLearn(); }
+  render();
+  // Scroll to top
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Tab button clicks
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+});
+
+// Utility: HTML-escape
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escAttr(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Render KaTeX in elements with data-katex attribute
+function renderKatexIn(root) {
+  root.querySelectorAll('[data-katex]').forEach(el => {
+    const raw = el.getAttribute('data-katex');
+    try {
+      // Support both inline ($...$) and block ($$...$$) formats
+      let tex = raw;
+      if (tex.startsWith('$$') && tex.endsWith('$$')) {
+        tex = tex.slice(2, -2);
+        katex.render(tex, el, { throwOnError: false, displayMode: true });
+      } else if (tex.startsWith('$') && tex.endsWith('$')) {
+        tex = tex.slice(1, -1);
+        katex.render(tex, el, { throwOnError: false, displayMode: false });
+      } else {
+        katex.render(tex, el, { throwOnError: false, displayMode: false });
+      }
+    } catch(e) {
+      el.textContent = raw; // fallback to plain text
+    }
+  });
+}
+
+// Initial render
+render();
+if (S.studentId && S.analysis && S.learnState === 'loading') startLearn();
+</script>
+</body>
+</html>
