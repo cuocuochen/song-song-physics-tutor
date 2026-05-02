@@ -5,6 +5,7 @@ import { ANALYZE_PROMPT } from '@/lib/prompts/analyze';
 import type { AnalysisResult } from '@/lib/types/analysis';
 import type OpenAI from 'openai';
 
+export const runtime = 'edge';
 export const maxDuration = 30;
 
 export async function POST(req: Request) {

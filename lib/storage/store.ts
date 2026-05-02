@@ -1,12 +1,8 @@
 import { kv } from '@vercel/kv';
-import { readFile, writeFile, mkdir, unlink, readdir } from 'fs/promises';
-import { join } from 'path';
-import { existsSync } from 'fs';
 import type { MemoryFile, LearningProfile, LearningLogEntry, ProfileUpdate } from './types';
 
 const MAX_LOGS = 50;
 const STUDENTS_SET = 'students';
-const DATA_DIR = join(process.cwd(), 'data', 'memory');
 
 function sanitize(name: string): string {
   return name.replace(/[<>:"/\\|?*.\s]+/g, '_').slice(0, 64) || 'unknown';
@@ -26,7 +22,7 @@ function emptyMemory(): MemoryFile {
   return { profile: EMPTY_PROFILE, logs: [], version: 1 };
 }
 
-// ---- Detect KV availability ----
+// ---- KV detection ----
 
 let kvAvailable: boolean | null = null;
 async function hasKV(): Promise<boolean> {
@@ -40,71 +36,21 @@ async function hasKV(): Promise<boolean> {
   return kvAvailable;
 }
 
-// ================ FILESYSTEM FALLBACK ================
-
-function fsPath(studentId: string): string {
-  return join(DATA_DIR, `${sanitize(studentId)}.json`);
-}
-
-async function ensureDir() {
-  if (!existsSync(DATA_DIR)) {
-    await mkdir(DATA_DIR, { recursive: true });
-  }
-}
-
-async function fsGet(studentId: string): Promise<MemoryFile> {
-  await ensureDir();
-  try {
-    const raw = await readFile(fsPath(studentId), 'utf-8');
-    return JSON.parse(raw) as MemoryFile;
-  } catch {
-    return emptyMemory();
-  }
-}
-
-async function fsSet(studentId: string, data: MemoryFile): Promise<void> {
-  await ensureDir();
-  await writeFile(fsPath(studentId), JSON.stringify(data, null, 2), 'utf-8');
-}
-
-async function fsDel(studentId: string): Promise<void> {
-  try { await unlink(fsPath(studentId)); } catch { /* nothing to delete */ }
-  try { await unlink(fsPath(studentId) + '.bak'); } catch { /* nothing to delete */ }
-}
-
-async function fsList(): Promise<string[]> {
-  await ensureDir();
-  try {
-    const files = await readdir(DATA_DIR);
-    return files
-      .filter(f => f.endsWith('.json') && !f.endsWith('.bak'))
-      .map(f => f.replace('.json', ''));
-  } catch {
-    return [];
-  }
-}
-
-// ================ PUBLIC API ================
-
 export async function getMemory(studentId: string): Promise<MemoryFile> {
-  if (await hasKV()) {
-    try {
-      const data = await kv.get<MemoryFile>(kvKey(studentId));
-      if (data && data.profile && data.logs) return data;
-    } catch { /* fall through */ }
-  }
-  return fsGet(studentId);
+  if (!(await hasKV())) return emptyMemory();
+  try {
+    const data = await kv.get<MemoryFile>(kvKey(studentId));
+    if (data && data.profile && data.logs) return data;
+  } catch { /* fall through */ }
+  return emptyMemory();
 }
 
 export async function saveMemory(studentId: string, data: MemoryFile): Promise<void> {
-  if (await hasKV()) {
-    try {
-      await kv.set(kvKey(studentId), data);
-      await kv.sadd(STUDENTS_SET, sanitize(studentId));
-      return;
-    } catch { /* fall through */ }
-  }
-  await fsSet(studentId, data);
+  if (!(await hasKV())) return;
+  try {
+    await kv.set(kvKey(studentId), data);
+    await kv.sadd(STUDENTS_SET, sanitize(studentId));
+  } catch { /* non-critical */ }
 }
 
 export async function addLog(
@@ -132,14 +78,11 @@ export async function deleteLog(studentId: string, logId: string): Promise<void>
 }
 
 export async function clearAll(studentId: string): Promise<void> {
-  if (await hasKV()) {
-    try {
-      await kv.del(kvKey(studentId));
-      await kv.srem(STUDENTS_SET, sanitize(studentId));
-      return;
-    } catch { /* fall through */ }
-  }
-  await fsDel(studentId);
+  if (!(await hasKV())) return;
+  try {
+    await kv.del(kvKey(studentId));
+    await kv.srem(STUDENTS_SET, sanitize(studentId));
+  } catch { /* non-critical */ }
 }
 
 export async function updateProfile(
@@ -186,11 +129,11 @@ export async function updateProfile(
 }
 
 export async function listStudents(): Promise<string[]> {
-  if (await hasKV()) {
-    try {
-      const members = await kv.smembers(STUDENTS_SET);
-      return members.filter((m): m is string => typeof m === 'string');
-    } catch { /* fall through */ }
+  if (!(await hasKV())) return [];
+  try {
+    const members = await kv.smembers(STUDENTS_SET);
+    return members.filter((m): m is string => typeof m === 'string');
+  } catch {
+    return [];
   }
-  return fsList();
 }

@@ -6,6 +6,7 @@ import { LEARN_PROMPT } from '@/lib/prompts/learn';
 import { addLog, updateProfile, getMemory } from '@/lib/storage/store';
 import type { LearnMessage } from '@/lib/types/analysis';
 
+export const runtime = 'edge';
 export const maxDuration = 30;
 
 export async function POST(req: Request) {
